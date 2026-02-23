@@ -32,6 +32,7 @@ class pbr_ps30_Static_Index
 	unsigned int m_nSPECULAR : 2;
 	unsigned int m_nPARALLAXOCCLUSION : 2;
 	unsigned int m_nWORLD_NORMAL : 2;
+	unsigned int m_nLIGHTWARPTEXTURE : 2;
 #ifdef _DEBUG
 	bool m_bFLASHLIGHT : 1;
 	bool m_bFLASHLIGHTDEPTHFILTERMODE : 1;
@@ -41,6 +42,7 @@ class pbr_ps30_Static_Index
 	bool m_bSPECULAR : 1;
 	bool m_bPARALLAXOCCLUSION : 1;
 	bool m_bWORLD_NORMAL : 1;
+	bool m_bLIGHTWARPTEXTURE : 1;
 #endif	// _DEBUG
 public:
 	void SetFLASHLIGHT( int i )
@@ -115,6 +117,15 @@ public:
 #endif	// _DEBUG
 	}
 
+	void SetLIGHTWARPTEXTURE( int i )
+	{
+		Assert( i >= 0 && i <= 1 );
+		m_nLIGHTWARPTEXTURE = i;
+#ifdef _DEBUG
+		m_bLIGHTWARPTEXTURE = true;
+#endif	// _DEBUG
+	}
+
 	pbr_ps30_Static_Index(  )
 	{
 		m_nFLASHLIGHT = 0;
@@ -125,6 +136,7 @@ public:
 		m_nSPECULAR = 0;
 		m_nPARALLAXOCCLUSION = 0;
 		m_nWORLD_NORMAL = 0;
+		m_nLIGHTWARPTEXTURE = 0;
 #ifdef _DEBUG
 		m_bFLASHLIGHT = false;
 		m_bFLASHLIGHTDEPTHFILTERMODE = false;
@@ -134,18 +146,19 @@ public:
 		m_bSPECULAR = false;
 		m_bPARALLAXOCCLUSION = false;
 		m_bWORLD_NORMAL = false;
+		m_bLIGHTWARPTEXTURE = false;
 #endif	// _DEBUG
 	}
 
 	int GetIndex() const
 	{
-		Assert( m_bFLASHLIGHT && m_bFLASHLIGHTDEPTHFILTERMODE && m_bLIGHTMAPPED && m_bUSEENVAMBIENT && m_bEMISSIVE && m_bSPECULAR && m_bPARALLAXOCCLUSION && m_bWORLD_NORMAL );
+		Assert( m_bFLASHLIGHT && m_bFLASHLIGHTDEPTHFILTERMODE && m_bLIGHTMAPPED && m_bUSEENVAMBIENT && m_bEMISSIVE && m_bSPECULAR && m_bPARALLAXOCCLUSION && m_bWORLD_NORMAL && m_bLIGHTWARPTEXTURE );
 		AssertMsg( !( ( m_nFLASHLIGHT == 0 ) && ( m_nFLASHLIGHTDEPTHFILTERMODE != 0 ) ), "Invalid combo combination ( ( FLASHLIGHT == 0 ) && ( FLASHLIGHTDEPTHFILTERMODE != 0 ) )" );
-		return ( 240 * m_nFLASHLIGHT ) + ( 480 * m_nFLASHLIGHTDEPTHFILTERMODE ) + ( 1440 * m_nLIGHTMAPPED ) + ( 2880 * m_nUSEENVAMBIENT ) + ( 5760 * m_nEMISSIVE ) + ( 11520 * m_nSPECULAR ) + ( 23040 * m_nPARALLAXOCCLUSION ) + ( 46080 * m_nWORLD_NORMAL ) + 0;
+		return ( 240 * m_nFLASHLIGHT ) + ( 480 * m_nFLASHLIGHTDEPTHFILTERMODE ) + ( 1440 * m_nLIGHTMAPPED ) + ( 2880 * m_nUSEENVAMBIENT ) + ( 5760 * m_nEMISSIVE ) + ( 11520 * m_nSPECULAR ) + ( 23040 * m_nPARALLAXOCCLUSION ) + ( 46080 * m_nWORLD_NORMAL ) + ( 92160 * m_nLIGHTWARPTEXTURE ) + 0;
 	}
 };
 
-#define shaderStaticTest_pbr_ps30 psh_forgot_to_set_static_FLASHLIGHT + psh_forgot_to_set_static_FLASHLIGHTDEPTHFILTERMODE + psh_forgot_to_set_static_LIGHTMAPPED + psh_forgot_to_set_static_USEENVAMBIENT + psh_forgot_to_set_static_EMISSIVE + psh_forgot_to_set_static_SPECULAR + psh_forgot_to_set_static_PARALLAXOCCLUSION + psh_forgot_to_set_static_WORLD_NORMAL
+#define shaderStaticTest_pbr_ps30 psh_forgot_to_set_static_FLASHLIGHT + psh_forgot_to_set_static_FLASHLIGHTDEPTHFILTERMODE + psh_forgot_to_set_static_LIGHTMAPPED + psh_forgot_to_set_static_USEENVAMBIENT + psh_forgot_to_set_static_EMISSIVE + psh_forgot_to_set_static_SPECULAR + psh_forgot_to_set_static_PARALLAXOCCLUSION + psh_forgot_to_set_static_WORLD_NORMAL + psh_forgot_to_set_static_LIGHTWARPTEXTURE
 
 
 class pbr_ps30_Dynamic_Index

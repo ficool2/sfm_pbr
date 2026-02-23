@@ -94,11 +94,12 @@ float GetAttenForLight(float4 lightAtten, int lightNum)
 }
 
 // Calculate direct light for one source
-float3 calculateLight(float3 lightIn, float3 lightIntensity, float3 lightOut, float3 normal, float3 fresnelReflectance, float roughness, float metalness, float lightDirectionAngle, float3 albedo)
+float3 calculateLight(float3 lightIn, float3 lightIntensity, float3 lightOut, float3 normal, float3 fresnelReflectance, float roughness, float metalness, float lightDirectionAngle, float3 albedo, in sampler lightWarpSampler)
 {
     // Lh
     float3 HalfAngle = normalize(lightIn + lightOut); 
-    float cosLightIn = max(0.0, dot(normal, lightIn));
+	float NDotL = dot(normal, lightIn);
+    float cosLightIn = max(0.0, NDotL);
     float cosHalfAngle = max(0.0, dot(normal, HalfAngle));
 
     // F - Calculate Fresnel term for direct lighting
@@ -126,10 +127,21 @@ float3 calculateLight(float3 lightIn, float3 lightIntensity, float3 lightOut, fl
     float3 specularBRDF = (F * D * G) / max(EPSILON, 4.0 * cosLightIn * lightDirectionAngle);
 #if LIGHTMAPPED && !FLASHLIGHT
     // Ambient light from static lights is already precomputed in the lightmap. Don't add it again
-    return specularBRDF * lightIntensity * cosLightIn;
+    float3 result = specularBRDF * lightIntensity * cosLightIn;
 #else
-    return (diffuseBRDF + specularBRDF) * lightIntensity * cosLightIn;
+    float3 result = (diffuseBRDF + specularBRDF) * lightIntensity * cosLightIn;
 #endif
+
+#if LIGHTWARPTEXTURE
+	// Lightwarp. Diffuse term computed as half lambertian (looks better)
+    float fHalfLambert = saturate(NDotL * 0.5 + 0.5);
+	// VLG only squared the intensity, but that's too dim for us
+    float3 warp = tex1D(lightWarpSampler, fHalfLambert).rgb * 3.0;
+	
+    result = (diffuseBRDF * warp + specularBRDF) * lightIntensity;
+#endif
+
+	return result;
 }
 
 // Get diffuse ambient light

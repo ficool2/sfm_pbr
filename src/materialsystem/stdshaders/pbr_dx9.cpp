@@ -26,6 +26,7 @@
 const Sampler_t SAMPLER_BASETEXTURE = SHADER_SAMPLER0;
 const Sampler_t SAMPLER_NORMAL = SHADER_SAMPLER1;
 const Sampler_t SAMPLER_ENVMAP = SHADER_SAMPLER2;
+const Sampler_t SAMPLER_LIGHTWARP = SHADER_SAMPLER3;
 const Sampler_t SAMPLER_SHADOWDEPTH = SHADER_SAMPLER4;
 const Sampler_t SAMPLER_RANDOMROTATION = SHADER_SAMPLER5;
 const Sampler_t SAMPLER_FLASHLIGHT = SHADER_SAMPLER6;
@@ -66,6 +67,7 @@ struct PBR_Vars_t
     int mraoTexture;
     int useEnvAmbient;
     int specularTexture;
+    int lightwarpTexture;
     int metalnessFactor;
     int roughnessFactor;
     int aoFactor;
@@ -85,6 +87,7 @@ BEGIN_VS_SHADER(PBR, "PBR shader")
         SHADER_PARAM(BUMPMAP, SHADER_PARAM_TYPE_TEXTURE, "", "Normal texture");
         SHADER_PARAM(USEENVAMBIENT, SHADER_PARAM_TYPE_BOOL, "0", "Use the cubemaps to compute ambient light.");
         SHADER_PARAM(SPECULARTEXTURE, SHADER_PARAM_TYPE_TEXTURE, "", "Specular F0 RGB map");
+        SHADER_PARAM(LIGHTWARPTEXTURE, SHADER_PARAM_TYPE_TEXTURE, "", "Lightwarp Texture" );
         SHADER_PARAM(PARALLAX, SHADER_PARAM_TYPE_BOOL, "0", "Use Parallax Occlusion Mapping.");
         SHADER_PARAM(PARALLAXDEPTH, SHADER_PARAM_TYPE_FLOAT, "0.0030", "Depth of the Parallax Map");
         SHADER_PARAM(PARALLAXCENTER, SHADER_PARAM_TYPE_FLOAT, "0.5", "Center depth of the Parallax Map");
@@ -111,6 +114,7 @@ BEGIN_VS_SHADER(PBR, "PBR shader")
         info.mraoTexture = MRAOTEXTURE;
         info.useEnvAmbient = USEENVAMBIENT;
         info.specularTexture = SPECULARTEXTURE;
+        info.lightwarpTexture = LIGHTWARPTEXTURE;
         info.useParallax = PARALLAX;
         info.parallaxDepth = PARALLAXDEPTH;
         info.parallaxCenter = PARALLAXCENTER;
@@ -194,6 +198,11 @@ BEGIN_VS_SHADER(PBR, "PBR shader")
             LoadTexture(info.specularTexture, TEXTUREFLAGS_SRGB);
         }
 
+        if ( params[info.lightwarpTexture]->IsDefined() )
+        {
+            LoadTexture(info.lightwarpTexture);
+        }
+
         if (IS_FLAG_SET(MATERIAL_VAR_MODEL)) // Set material var2 flags specific to models
         {
             SET_FLAGS2(MATERIAL_VAR2_SUPPORTS_HW_SKINNING);             // Required for skinning
@@ -234,6 +243,7 @@ BEGIN_VS_SHADER(PBR, "PBR shader")
         bool bLightMapped = !IS_FLAG_SET(MATERIAL_VAR_MODEL);
         bool bUseEnvAmbient = (info.useEnvAmbient != -1) && (params[info.useEnvAmbient]->GetIntValue() == 1);
         bool bHasSpecularTexture = (info.specularTexture != -1) && params[info.specularTexture]->IsTexture();
+        bool bLightwarpTexture = (info.lightwarpTexture != -1) && params[info.lightwarpTexture]->IsTexture();
 
         // Determining whether we're dealing with a fully opaque material
         BlendType_t nBlendType = EvaluateBlendRequirements(info.baseTexture, true);
@@ -275,7 +285,7 @@ BEGIN_VS_SHADER(PBR, "PBR shader")
             pShaderShadow->EnableTexture(SAMPLER_SPECULAR, true);       // Specular F0 texture
             pShaderShadow->EnableSRGBRead(SAMPLER_SPECULAR, true);      // Specular F0 is sRGB
             pShaderShadow->EnableTexture(SAMPLER_SSAO, true);           // SSAO texture
-            pShaderShadow->EnableSRGBRead( SAMPLER_SSAO, true);         // SSAO is sRGB
+            pShaderShadow->EnableSRGBRead(SAMPLER_SSAO, true);         // SSAO is sRGB
 
             // If the flashlight is on, set up its textures
             if (bHasFlashlight)
@@ -296,6 +306,13 @@ BEGIN_VS_SHADER(PBR, "PBR shader")
                 {
                     pShaderShadow->EnableSRGBRead(SAMPLER_ENVMAP, true); // Envmap is only sRGB with HDR disabled?
                 }
+            }
+
+            // Lightwarp
+            if (bLightwarpTexture)
+            {
+                pShaderShadow->EnableTexture(SAMPLER_LIGHTWARP, true); 
+                pShaderShadow->EnableSRGBRead(SAMPLER_LIGHTWARP, false);
             }
 
             // Enabling sRGB writing
@@ -363,6 +380,7 @@ BEGIN_VS_SHADER(PBR, "PBR shader")
                 SET_STATIC_PIXEL_SHADER_COMBO(SPECULAR, bHasSpecularTexture);
                 SET_STATIC_PIXEL_SHADER_COMBO(PARALLAXOCCLUSION, useParallax);
                 SET_STATIC_PIXEL_SHADER_COMBO(WORLD_NORMAL, bWorldNormal);
+                SET_STATIC_PIXEL_SHADER_COMBO(LIGHTWARPTEXTURE, bLightwarpTexture);
                 SET_STATIC_PIXEL_SHADER(pbr_ps30);
             }
 
@@ -463,6 +481,11 @@ BEGIN_VS_SHADER(PBR, "PBR shader")
             else
             {
                 pShaderAPI->BindStandardTexture(SAMPLER_SPECULAR, TEXTURE_BLACK);
+            }
+
+            if (bLightwarpTexture)
+            {
+                BindTexture(SAMPLER_LIGHTWARP, info.lightwarpTexture, 0);
             }
 
             // Getting the light state
