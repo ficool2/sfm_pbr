@@ -70,6 +70,8 @@ struct PBR_Vars_t
     int lightwarpTexture;
     int metalnessFactor;
     int roughnessFactor;
+    int emissiveFactor;
+    int specularFactor;
     int aoFactor;
     int ssaoFactor;
 };
@@ -93,6 +95,8 @@ BEGIN_VS_SHADER(PBR, "PBR shader")
         SHADER_PARAM(PARALLAXCENTER, SHADER_PARAM_TYPE_FLOAT, "0.5", "Center depth of the Parallax Map");
         SHADER_PARAM(METALNESSFACTOR, SHADER_PARAM_TYPE_FLOAT, "1.0", "Metalness factor");
         SHADER_PARAM(ROUGHNESSFACTOR, SHADER_PARAM_TYPE_FLOAT, "1.0", "Roughness factor");
+        SHADER_PARAM(EMISSIVEFACTOR, SHADER_PARAM_TYPE_FLOAT, "1.0", "Emissive factor" );
+        SHADER_PARAM(SPECULARFACTOR, SHADER_PARAM_TYPE_FLOAT, "1.0", "Specular factor" );
         SHADER_PARAM(AOFACTOR, SHADER_PARAM_TYPE_FLOAT, "1.0", "Ambient occlusion factor");
         SHADER_PARAM(SSAOFACTOR, SHADER_PARAM_TYPE_FLOAT, "1.0", "Screen space ambient occlusion factor");
     END_SHADER_PARAMS;
@@ -120,6 +124,8 @@ BEGIN_VS_SHADER(PBR, "PBR shader")
         info.parallaxCenter = PARALLAXCENTER;
         info.metalnessFactor = METALNESSFACTOR;
         info.roughnessFactor = ROUGHNESSFACTOR;
+        info.emissiveFactor = EMISSIVEFACTOR;
+        info.specularFactor = SPECULARFACTOR;
         info.aoFactor = AOFACTOR;
         info.ssaoFactor = SSAOFACTOR;
 
@@ -651,7 +657,15 @@ BEGIN_VS_SHADER(PBR, "PBR shader")
                 GetFloatParam( info.aoFactor, params, 1.0f ),
                 GetFloatParam( info.ssaoFactor, params, 1.0f ) * flSSAOStrength
             };
-            pShaderAPI->SetPixelShaderConstant(PSREG_MRAO_FACTORS, vMRAOFactors, 1);
+            pShaderAPI->SetPixelShaderConstant(PSREG_PBR_MRAO_FACTORS, vMRAOFactors, 1);
+
+            // Emissive, specular factors
+            float vExtraFactors[4] =
+            {
+                GetFloatParam( info.emissiveFactor, params, 1.0f ),
+                GetFloatParam( info.specularFactor, params, 1.0f ),
+            };
+            pShaderAPI->SetPixelShaderConstant(PSREG_PBR_EXTRA_FACTORS, vExtraFactors, 1);
 
             // Need this for sampling SSAO
             pShaderAPI->SetScreenSizeForVPOS();

@@ -32,7 +32,6 @@
 // Only do world normals in constrained case
 // SKIP: ( $WORLD_NORMAL == 1 ) && ( $FLASHLIGHTSHADOWS == 1 ) && ( $NUM_LIGHTS != 0 ) && ( $WRITEWATERFOGTODESTALPHA == 1 )
 
-
 #include "common_ps_fxc.h"
 #include "common_flashlight_fxc.h"
 #include "common_lightmappedgeneric_fxc.h"
@@ -66,7 +65,8 @@ const float4 g_aAbB								: register(PSREG_UBERLIGHT_AABB);
 const float4x4 g_FlashlightWorldToLight			: register(PSREG_UBERLIGHT_WORLD_TO_LIGHT);
 #endif
 
-const float4 g_MRAOFactors						: register(PSREG_MRAO_FACTORS); // Metalness, roughness, AO, SSAO factor
+const float4 g_MRAOFactors						: register(PSREG_PBR_MRAO_FACTORS); // Metalness, roughness, AO, SSAO factor
+const float4 g_EmissiveSpecularFactors			: register(PSREG_PBR_EXTRA_FACTORS); // Emissive, specular factor
 
 sampler BaseTextureSampler          : register(s0);     // Base map, selfillum in alpha
 sampler NormalTextureSampler        : register(s1);     // Normal map
@@ -137,10 +137,10 @@ float4 main(PS_INPUT i) : COLOR
 	float ambientOcclusion = mrao.z;
 	
 #if EMISSIVE
-    float3 emission = tex2D(EmissionTextureSampler, correctedTexCoord).xyz;
+    float3 emission = tex2D(EmissionTextureSampler, correctedTexCoord).xyz * g_EmissiveSpecularFactors.x;
 #endif
 #if SPECULAR
-    float3 specular = tex2D(SpecularTextureSampler, correctedTexCoord).xyz;
+    float3 specular = tex2D(SpecularTextureSampler, correctedTexCoord).xyz * g_EmissiveSpecularFactors.y;
 #endif
 
 	// SSAO samplo
