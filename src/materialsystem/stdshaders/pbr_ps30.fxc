@@ -130,7 +130,7 @@ float4 main(PS_INPUT i) : COLOR
     float4 albedo = tex2D(BaseTextureSampler, correctedTexCoord);
     albedo.xyz *= g_BaseColor;
 
-    float3 mrao = tex2D(MRAOTextureSampler, correctedTexCoord).xyz * g_MRAOFactors.xyz;
+    float3 mrao = saturate(tex2D(MRAOTextureSampler, correctedTexCoord).xyz * g_MRAOFactors.xyz);
 	
     float metalness = mrao.x;
 	float roughness = mrao.y;
@@ -140,7 +140,7 @@ float4 main(PS_INPUT i) : COLOR
     float3 emission = tex2D(EmissionTextureSampler, correctedTexCoord).xyz * g_EmissiveSpecularFactors.x;
 #endif
 #if SPECULAR
-    float3 specular = tex2D(SpecularTextureSampler, correctedTexCoord).xyz * g_EmissiveSpecularFactors.y;
+    float3 specular = saturate(tex2D(SpecularTextureSampler, correctedTexCoord).xyz * g_EmissiveSpecularFactors.y);
 #endif
 
 	// SSAO samplo
