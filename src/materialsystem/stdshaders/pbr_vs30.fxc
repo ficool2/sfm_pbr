@@ -35,7 +35,7 @@ struct VS_INPUT
     float4 vLightmapTexCoord        : TEXCOORD1;
     float4 vLightmapTexCoordOffset  : TEXCOORD2;
 	// Stuff used by flexes
-	float3 vPosFlex					: POSITION1;
+	float4 vPosFlex					: POSITION1;
 	float3 vNormalFlex				: NORMAL1;
 };
 
@@ -48,7 +48,7 @@ struct VS_OUTPUT
     float4 lightAtten               : TEXCOORD1;
     float3 worldNormal              : TEXCOORD2;
     float3 worldPos                 : TEXCOORD3;
-    float3 projPos                  : TEXCOORD4;
+    float4 projPos_wrinkleWeight    : TEXCOORD4; // wrinkle weight in w
     float4 lightmapTexCoord1And2    : TEXCOORD5;
     float4 lightmapTexCoord3        : TEXCOORD6;
 };
@@ -82,7 +82,8 @@ VS_OUTPUT main( const VS_INPUT v )
 	DecompressVertex_Normal(v.vNormal, vNormal);
 	
 	// Flexes (shapekeys)
-	ApplyMorph(v.vPosFlex, v.vNormalFlex, vPosition.xyz, vNormal);
+	float wrinkle;
+	ApplyMorph(v.vPosFlex, v.vNormalFlex, vPosition.xyz, vNormal, wrinkle);
 
 	// Skinning (bones)
     float3 worldNormal, worldPos;
@@ -92,7 +93,8 @@ VS_OUTPUT main( const VS_INPUT v )
     float4 vProjPos = mul(float4(worldPos, 1), cViewProj);
     o.projPosSetup = vProjPos;
 
-    o.projPos = vProjPos.xyz;
+    o.projPos_wrinkleWeight.xyz = vProjPos.xyz;
+	o.projPos_wrinkleWeight.w = wrinkle;
 	
     // Needed for water fog alpha and diffuse lighting 
     o.worldPos = worldPos;

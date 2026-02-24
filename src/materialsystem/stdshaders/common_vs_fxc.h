@@ -365,6 +365,17 @@ bool ApplyMorph( float3 vPosFlex, float3 vNormalFlex, inout float3 vPosition, in
 	return true;
 }
 
+bool ApplyMorph( float4 vPosFlex, float3 vNormalFlex, inout float3 vPosition, inout float3 vNormal, out float flWrinkle )
+{
+	// Flexes coming in from a separate stream
+	float3 vPosDelta = vPosFlex.xyz * cFlexScale.x;
+	float3 vNormalDelta = vNormalFlex.xyz * cFlexScale.x;
+	flWrinkle = vPosFlex.w * cFlexScale.y;
+	vPosition.xyz += vPosDelta;
+	vNormal       += vNormalDelta;
+	return true;
+}
+
 bool ApplyMorph( float3 vPosFlex, float3 vNormalFlex, 
 	inout float3 vPosition, inout float3 vNormal, inout float3 vTangent )
 {
@@ -389,125 +400,6 @@ bool ApplyMorph( float4 vPosFlex, float3 vNormalFlex,
 	vTangent.xyz  += vNormalDelta;
 	return true;
 }
-
-#ifdef SHADER_MODEL_VS_3_0
-
-bool ApplyMorph( sampler2D morphSampler, const float3 vMorphTargetTextureDim, const float4 vMorphSubrect, 
-				const float flVertexID, const float3 vMorphTexCoord,
-				inout float3 vPosition )
-{
-#if MORPHING
-
-#if !DECAL
-	// Flexes coming in from a separate stream
-	float4 vPosDelta = SampleMorphDelta( morphSampler, vMorphTargetTextureDim, vMorphSubrect, flVertexID, 0 );
-	vPosition	+= vPosDelta.xyz;
-#else
-	float4 t = float4( vMorphTexCoord.x, vMorphTexCoord.y, 0.0f, 0.0f );
-	float3 vPosDelta = tex2Dlod( morphSampler, t );
-	vPosition	+= vPosDelta.xyz * vMorphTexCoord.z;
-#endif // DECAL
-
-	return true;
-
-#else // !MORPHING
-	return false;
-#endif
-}
- 
-bool ApplyMorph( sampler2D morphSampler, const float3 vMorphTargetTextureDim, const float4 vMorphSubrect, 
-				const float flVertexID, const float3 vMorphTexCoord, 
-				inout float3 vPosition, inout float3 vNormal )
-{
-#if MORPHING
-
-#if !DECAL
-	float4 vPosDelta, vNormalDelta;
-	SampleMorphDelta2( morphSampler, vMorphTargetTextureDim, vMorphSubrect, flVertexID, vPosDelta, vNormalDelta );
-	vPosition	+= vPosDelta.xyz;
-	vNormal		+= vNormalDelta.xyz;
-#else
-	float4 t = float4( vMorphTexCoord.x, vMorphTexCoord.y, 0.0f, 0.0f );
-	float3 vPosDelta = tex2Dlod( morphSampler, t );
-	t.x += 1.0f / vMorphTargetTextureDim.x;
-	float3 vNormalDelta = tex2Dlod( morphSampler, t );
-	vPosition	+= vPosDelta.xyz * vMorphTexCoord.z;
-	vNormal		+= vNormalDelta.xyz * vMorphTexCoord.z;
-#endif // DECAL
-
-	return true;
-
-#else // !MORPHING
-	return false;
-#endif
-}
-
-bool ApplyMorph( sampler2D morphSampler, const float3 vMorphTargetTextureDim, const float4 vMorphSubrect, 
-				const float flVertexID, const float3 vMorphTexCoord, 
-				inout float3 vPosition, inout float3 vNormal, inout float3 vTangent )
-{
-#if MORPHING
-
-#if !DECAL
-	float4 vPosDelta, vNormalDelta;
-	SampleMorphDelta2( morphSampler, vMorphTargetTextureDim, vMorphSubrect, flVertexID, vPosDelta, vNormalDelta );
-	vPosition	+= vPosDelta.xyz;
-	vNormal		+= vNormalDelta.xyz;
-	vTangent	+= vNormalDelta.xyz;
-#else
-	float4 t = float4( vMorphTexCoord.x, vMorphTexCoord.y, 0.0f, 0.0f );
-	float3 vPosDelta = tex2Dlod( morphSampler, t );
-	t.x += 1.0f / vMorphTargetTextureDim.x;
-	float3 vNormalDelta = tex2Dlod( morphSampler, t );
-	vPosition	+= vPosDelta.xyz * vMorphTexCoord.z;
-	vNormal		+= vNormalDelta.xyz * vMorphTexCoord.z;
-	vTangent	+= vNormalDelta.xyz * vMorphTexCoord.z;
-#endif // DECAL
-
-	return true;
-
-#else // MORPHING
-
-	return false;
-#endif
-}
-
-bool ApplyMorph( sampler2D morphSampler, const float3 vMorphTargetTextureDim, const float4 vMorphSubrect,
-	const float flVertexID, const float3 vMorphTexCoord,
-	inout float3 vPosition, inout float3 vNormal, inout float3 vTangent, out float flWrinkle )
-{
-#if MORPHING
-
-#if !DECAL
-	float4 vPosDelta, vNormalDelta;
-	SampleMorphDelta2( morphSampler, vMorphTargetTextureDim, vMorphSubrect, flVertexID, vPosDelta, vNormalDelta );
-	vPosition	+= vPosDelta.xyz;
-	vNormal		+= vNormalDelta.xyz;
-	vTangent	+= vNormalDelta.xyz;
-	flWrinkle = vPosDelta.w;
-#else
-	float4 t = float4( vMorphTexCoord.x, vMorphTexCoord.y, 0.0f, 0.0f );
-	float4 vPosDelta = tex2Dlod( morphSampler, t );
-	t.x += 1.0f / vMorphTargetTextureDim.x;
-	float3 vNormalDelta = tex2Dlod( morphSampler, t );
-
-	vPosition	+= vPosDelta.xyz * vMorphTexCoord.z;
-	vNormal		+= vNormalDelta.xyz * vMorphTexCoord.z;
-	vTangent	+= vNormalDelta.xyz * vMorphTexCoord.z;
-	flWrinkle	= vPosDelta.w * vMorphTexCoord.z;
-#endif // DECAL
-
-	return true;
-
-#else // MORPHING
-
-	flWrinkle = 0.0f;
-	return false;
-
-#endif
-}
-
-#endif   // SHADER_MODEL_VS_3_0
 
 float CalcFixedFunctionFog( const float3 worldPos, const bool bWaterFog )
 {

@@ -31,10 +31,14 @@ const Sampler_t SAMPLER_SHADOWDEPTH = SHADER_SAMPLER4;
 const Sampler_t SAMPLER_RANDOMROTATION = SHADER_SAMPLER5;
 const Sampler_t SAMPLER_FLASHLIGHT = SHADER_SAMPLER6;
 const Sampler_t SAMPLER_LIGHTMAP = SHADER_SAMPLER7;
+const Sampler_t SAMPLER_COMPRESS = SHADER_SAMPLER8;
+const Sampler_t SAMPLER_STRETCH = SHADER_SAMPLER9;
 const Sampler_t SAMPLER_MRAO = SHADER_SAMPLER10;
 const Sampler_t SAMPLER_EMISSIVE = SHADER_SAMPLER11;
 const Sampler_t SAMPLER_SPECULAR = SHADER_SAMPLER12;
 const Sampler_t SAMPLER_SSAO = SHADER_SAMPLER13;
+const Sampler_t SAMPLER_BUMPCOMPRESS = SHADER_SAMPLER14;
+const Sampler_t SAMPLER_BUMPSTRETCH = SHADER_SAMPLER15;
 
 // Convars
 static ConVar mat_fullbright("mat_fullbright", "0", FCVAR_CHEAT);
@@ -74,6 +78,10 @@ struct PBR_Vars_t
     int specularFactor;
     int aoFactor;
     int ssaoFactor;
+    int compressTexture;
+    int bumpCompressTexture;
+    int stretchTexture;
+    int bumpStretchTexture;
 };
 
 // Beginning the shader
@@ -99,6 +107,10 @@ BEGIN_VS_SHADER(PBR, "PBR shader")
         SHADER_PARAM(SPECULARFACTOR, SHADER_PARAM_TYPE_FLOAT, "1.0", "Specular factor" );
         SHADER_PARAM(AOFACTOR, SHADER_PARAM_TYPE_FLOAT, "1.0", "Ambient occlusion factor");
         SHADER_PARAM(SSAOFACTOR, SHADER_PARAM_TYPE_FLOAT, "1.0", "Screen space ambient occlusion factor");
+        SHADER_PARAM(COMPRESS, SHADER_PARAM_TYPE_TEXTURE, "", "Compression wrinklemap");
+        SHADER_PARAM(BUMPCOMPRESS, SHADER_PARAM_TYPE_TEXTURE, "", "Stretch bumpmap" );
+        SHADER_PARAM(STRETCH, SHADER_PARAM_TYPE_TEXTURE, "", "Stretch wrinklemap");
+        SHADER_PARAM(BUMPSTRETCH, SHADER_PARAM_TYPE_TEXTURE, "", "Compression bumpmap" );
     END_SHADER_PARAMS;
 
     // Setting up variables for this shader
@@ -128,7 +140,10 @@ BEGIN_VS_SHADER(PBR, "PBR shader")
         info.specularFactor = SPECULARFACTOR;
         info.aoFactor = AOFACTOR;
         info.ssaoFactor = SSAOFACTOR;
-
+        info.compressTexture = COMPRESS;
+        info.bumpCompressTexture = BUMPCOMPRESS;
+        info.stretchTexture = STRETCH;
+        info.bumpStretchTexture = BUMPSTRETCH;
     };
 
     // Initializing parameters
@@ -149,6 +164,21 @@ BEGIN_VS_SHADER(PBR, "PBR shader")
         // PBR relies heavily on envmaps
         if (!params[ENVMAP]->IsDefined())
             params[ENVMAP]->SetStringValue("env_cubemap");
+
+        // If using wrinklemaps, all the textures need to be filled in
+        if (params[COMPRESS]->IsDefined() || params[BUMPCOMPRESS]->IsDefined() ||
+            params[STRETCH]->IsDefined() || params[BUMPSTRETCH]->IsDefined())
+        {
+            if (!params[COMPRESS]->IsDefined())
+                params[COMPRESS]->SetStringValue(params[BASETEXTURE]->GetStringValue());
+            if (!params[BUMPCOMPRESS]->IsDefined())
+                params[BUMPCOMPRESS]->SetStringValue(params[BUMPMAP]->GetStringValue());
+        
+            if (!params[STRETCH]->IsDefined())
+                params[STRETCH]->SetStringValue(params[BASETEXTURE]->GetStringValue());
+            if (!params[BUMPSTRETCH]->IsDefined())
+                params[BUMPSTRETCH]->SetStringValue(params[BUMPMAP]->GetStringValue());
+        }
 
         // Check if the hardware supports flashlight border color
         if (g_pHardwareConfig->SupportsBorderColor())
@@ -198,7 +228,7 @@ BEGIN_VS_SHADER(PBR, "PBR shader")
 
         if (params[info.baseTexture]->IsDefined())
         {
-            LoadTexture(info.baseTexture, TEXTUREFLAGS_SRGB );
+            LoadTexture(info.baseTexture, TEXTUREFLAGS_SRGB);
         }
 
         if (params[info.specularTexture]->IsDefined())
@@ -206,9 +236,18 @@ BEGIN_VS_SHADER(PBR, "PBR shader")
             LoadTexture(info.specularTexture, TEXTUREFLAGS_SRGB);
         }
 
-        if ( params[info.lightwarpTexture]->IsDefined() )
+        if (params[info.lightwarpTexture]->IsDefined())
         {
             LoadTexture(info.lightwarpTexture);
+        }
+
+        // If compress is present this means all wrinklemap textures should be present
+        if (params[info.compressTexture]->IsDefined())
+        {
+            LoadTexture(info.compressTexture, TEXTUREFLAGS_SRGB);
+            LoadTexture(info.bumpCompressTexture);
+            LoadTexture(info.stretchTexture, TEXTUREFLAGS_SRGB);
+            LoadTexture(info.bumpStretchTexture);
         }
 
         if (IS_FLAG_SET(MATERIAL_VAR_MODEL)) // Set material var2 flags specific to models
@@ -252,6 +291,8 @@ BEGIN_VS_SHADER(PBR, "PBR shader")
         bool bUseEnvAmbient = (info.useEnvAmbient != -1) && (params[info.useEnvAmbient]->GetIntValue() == 1);
         bool bHasSpecularTexture = (info.specularTexture != -1) && params[info.specularTexture]->IsTexture();
         bool bLightwarpTexture = (info.lightwarpTexture != -1) && params[info.lightwarpTexture]->IsTexture();
+        // Only supported on models
+        bool bWrinkleMapping = !bLightMapped && (info.compressTexture != -1) && params[info.compressTexture]->IsDefined();
 
         // Determining whether we're dealing with a fully opaque material
         BlendType_t nBlendType = EvaluateBlendRequirements(info.baseTexture, true);
@@ -323,6 +364,19 @@ BEGIN_VS_SHADER(PBR, "PBR shader")
                 pShaderShadow->EnableSRGBRead(SAMPLER_LIGHTWARP, false);
             }
 
+            // Wrinkle mapping
+            if (bWrinkleMapping)
+            {
+                pShaderShadow->EnableTexture(SAMPLER_COMPRESS, true); 
+                pShaderShadow->EnableSRGBRead(SAMPLER_COMPRESS, true);
+                pShaderShadow->EnableTexture(SAMPLER_STRETCH, true); 
+                pShaderShadow->EnableSRGBRead(SAMPLER_STRETCH, true);
+                pShaderShadow->EnableTexture(SAMPLER_BUMPCOMPRESS, true); 
+                pShaderShadow->EnableSRGBRead(SAMPLER_BUMPCOMPRESS, false);
+                pShaderShadow->EnableTexture(SAMPLER_BUMPCOMPRESS, true); 
+                pShaderShadow->EnableSRGBRead(SAMPLER_BUMPCOMPRESS, false);
+            }
+
             // Enabling sRGB writing
             // See common_ps_fxc.h line 349
             // PS2b shaders and up write sRGB
@@ -344,7 +398,8 @@ BEGIN_VS_SHADER(PBR, "PBR shader")
             }
         
             int useParallax = params[info.useParallax]->GetIntValue();
-            if (!mat_pbr_parallaxmap.GetBool())
+            // Parallax and wrinkle are incompatible
+            if (!mat_pbr_parallaxmap.GetBool() || bWrinkleMapping)
             {
                 useParallax = 0;
             }
@@ -389,6 +444,7 @@ BEGIN_VS_SHADER(PBR, "PBR shader")
                 SET_STATIC_PIXEL_SHADER_COMBO(PARALLAXOCCLUSION, useParallax);
                 SET_STATIC_PIXEL_SHADER_COMBO(WORLD_NORMAL, bWorldNormal);
                 SET_STATIC_PIXEL_SHADER_COMBO(LIGHTWARPTEXTURE, bLightwarpTexture);
+                SET_STATIC_PIXEL_SHADER_COMBO(WRINKLEMAP, bWrinkleMapping);
                 SET_STATIC_PIXEL_SHADER(pbr_ps30);
             }
 
@@ -496,6 +552,14 @@ BEGIN_VS_SHADER(PBR, "PBR shader")
                 BindTexture(SAMPLER_LIGHTWARP, info.lightwarpTexture, 0);
             }
 
+            if (bWrinkleMapping)
+            {
+                BindTexture(SAMPLER_COMPRESS, info.compressTexture, 0);
+                BindTexture(SAMPLER_STRETCH, info.stretchTexture, 0);
+                BindTexture(SAMPLER_BUMPCOMPRESS, info.bumpCompressTexture, 0);
+                BindTexture(SAMPLER_BUMPSTRETCH, info.bumpStretchTexture, 0);
+            }
+
             // Getting the light state
             LightState_t lightState;
             pShaderAPI->GetDX9LightState(&lightState);
@@ -576,7 +640,8 @@ BEGIN_VS_SHADER(PBR, "PBR shader")
             pShaderAPI->SetPixelShaderConstant(PSREG_EYEPOS_SPEC_EXPONENT, vEyePos_SpecExponent, 1);
 
             // Setting lightmap texture
-            s_pShaderAPI->BindStandardTexture(SAMPLER_LIGHTMAP, TEXTURE_LIGHTMAP_BUMPED);
+            if (bLightMapped)
+                s_pShaderAPI->BindStandardTexture(SAMPLER_LIGHTMAP, TEXTURE_LIGHTMAP);
 
 #if 0
             if (!g_pHardwareConfig->SupportsShaderModel_3_0() || mat_pbr_force_20b.GetBool())

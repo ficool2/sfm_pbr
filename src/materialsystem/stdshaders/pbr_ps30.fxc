@@ -13,6 +13,7 @@
 // STATIC: "PARALLAXOCCLUSION"          "0..1"
 // STATIC: "WORLD_NORMAL"				"0..1"
 // STATIC: "LIGHTWARPTEXTURE"			"0..1"
+// STATIC: "WRINKLEMAP"					"0..1"
 
 // DYNAMIC: "WRITEWATERFOGTODESTALPHA"  "0..1"
 // DYNAMIC: "PIXELFOGTYPE"              "0..2"
@@ -31,6 +32,8 @@
 // SKIP: ( $FLASHLIGHT == 0 ) && ( $UBERLIGHT == 1 )
 // Only do world normals in constrained case
 // SKIP: ( $WORLD_NORMAL == 1 ) && ( $FLASHLIGHTSHADOWS == 1 ) && ( $NUM_LIGHTS != 0 ) && ( $WRITEWATERFOGTODESTALPHA == 1 )
+// Wrinkle and parallax/lightmapping are incompatible
+// SKIP: ( $WRINKLEMAP != 0 ) && ( $PARALLAXOCCLUSION != 0 || $LIGHTMAPPED != 0 )
 
 #include "common_ps_fxc.h"
 #include "common_flashlight_fxc.h"
@@ -76,6 +79,12 @@ sampler ShadowDepthSampler          : register(s4);     // Flashlight shadow dep
 sampler RandRotSampler              : register(s5);     // RandomRotation sampler
 sampler FlashlightSampler           : register(s6);     // Flashlight cookie 
 sampler LightmapSampler             : register(s7);     // Lightmap
+#if WRINKLEMAP
+sampler WrinkleSampler				: register(s8);		// Compression base
+sampler StretchSampler				: register(s9);		// Expansion base
+sampler NormalWrinkleSampler		: register(s14);	// Compression normal
+sampler NormalStretchSampler		: register(s15);	// Expansion normal
+#endif
 sampler MRAOTextureSampler          : register(s10);    // MRAO texture
 #if EMISSIVE
 sampler EmissionTextureSampler      : register(s11);    // Emission texture
@@ -95,7 +104,7 @@ struct PS_INPUT
     float4 lightAtten               : TEXCOORD1;
     float3 worldNormal              : TEXCOORD2;
     float3 worldPos                 : TEXCOORD3;
-    float3 projPos                  : TEXCOORD4;
+    float4 projPos_wrinkleWeight    : TEXCOORD4; // wrinkle weight in w
     float4 lightmapTexCoord1And2    : TEXCOORD5; 
     float4 lightmapTexCoord3        : TEXCOORD6;
 };
@@ -124,11 +133,41 @@ float4 main(PS_INPUT i) : COLOR
     float2 correctedTexCoord = i.baseTexCoord;
 #endif
 
-    float3 textureNormal = normalize((tex2D( NormalTextureSampler,  correctedTexCoord).xyz - float3(0.5, 0.5, 0.5)) * 2);
-    float3 normal = normalize(mul(textureNormal, normalBasis)); // World Normal
-
     float4 albedo = tex2D(BaseTextureSampler, correctedTexCoord);
+	
+	float wrinkleAmount, stretchAmount, textureAmount;
+#if WRINKLEMAP
+	{
+		float wrinkleWeight = i.projPos_wrinkleWeight.w;
+
+		wrinkleAmount = saturate(-wrinkleWeight);	// One of these two is zero
+		stretchAmount = saturate(wrinkleWeight);	// while the other is in the 0..1 range
+
+		textureAmount = 1.0f - wrinkleAmount - stretchAmount; // These should sum to one
+
+		float4 wrinkleColor = tex2D(WrinkleSampler, correctedTexCoord);
+		float4 stretchColor = tex2D(StretchSampler, correctedTexCoord);
+
+		// Apply wrinkle blend to only RGB
+		albedo.rgb =  (textureAmount * albedo) 
+					+ (wrinkleAmount * wrinkleColor) 
+					+ (stretchAmount * stretchColor);
+	}
+#endif
+	
     albedo.xyz *= g_BaseColor;
+	
+	float3 normalTexel = tex2D(NormalTextureSampler, correctedTexCoord).xyz;
+#if WRINKLEMAP
+	{
+		float3 wrinkleNormal = tex2D(NormalWrinkleSampler, correctedTexCoord).xyz;
+		float3 stretchNormal = tex2D(NormalStretchSampler, correctedTexCoord).xyz;
+		normalTexel = textureAmount * normalTexel + wrinkleAmount * wrinkleNormal + stretchAmount * stretchNormal;
+	}
+#endif
+	
+    float3 textureNormal = normalize((normalTexel - float3(0.5, 0.5, 0.5)) * 2);
+    float3 normal = normalize(mul(textureNormal, normalBasis)); // World Normal
 
     float3 mrao = saturate(tex2D(MRAOTextureSampler, correctedTexCoord).xyz * g_MRAOFactors.xyz);
 	
@@ -160,6 +199,8 @@ float4 main(PS_INPUT i) : COLOR
     float3 dielectricCoefficient = 0.04; //F0 dielectric
     float3 fresnelReflectance = lerp(dielectricCoefficient, albedo.rgb, metalness); // F0
 #endif
+
+	float3 projPos = i.projPos_wrinkleWeight.xyz;
 
     // Start ambient
     float3 ambientLighting = 0.0;
@@ -216,7 +257,7 @@ float4 main(PS_INPUT i) : COLOR
 		float fAtten = saturate(dot(g_FlashlightAttenuationFactors.xyz, float3(1.0, 1.0 / dist, 1.0 / distSquared)));
 
 #if FLASHLIGHTSHADOWS
-        float flashlightShadow = DoFlashlightShadow(ShadowDepthSampler, RandRotSampler, vProjCoords, i.projPos, FLASHLIGHTDEPTHFILTERMODE, g_ShadowTweaks, true);
+        float flashlightShadow = DoFlashlightShadow(ShadowDepthSampler, RandRotSampler, vProjCoords, projPos, FLASHLIGHTDEPTHFILTERMODE, g_ShadowTweaks, true);
         float flashlightAttenuated = lerp(flashlightShadow, 1.0, g_ShadowTweaks.y);         // Blend between fully attenuated and not attenuated
         flashlightShadow = saturate(lerp(flashlightAttenuated, flashlightShadow, fAtten));  // Blend between shadow and above, according to light attenuation
 
@@ -245,7 +286,7 @@ float4 main(PS_INPUT i) : COLOR
 
 float fogFactor = 0.0f;
 #if !FLASHLIGHT
-fogFactor = CalcPixelFogFactor(PIXELFOGTYPE, g_FogParams, g_EyePos.xyz, i.worldPos.xyz, i.projPos.z);
+fogFactor = CalcPixelFogFactor(PIXELFOGTYPE, g_FogParams, g_EyePos.xyz, i.worldPos.xyz, projPos.z);
 #endif
 
 float alpha = 0.0f;
@@ -266,6 +307,6 @@ float alpha = 0.0f;
 	float fSSAODepth = i.lightmapTexCoord3.w;
 	return float4( normal, fSSAODepth );
 #else
-    return FinalOutput(float4(combinedLighting, alpha), fogFactor, PIXELFOGTYPE, TONEMAP_SCALE_LINEAR, bWriteDepthToAlpha, i.projPos.z);
+    return FinalOutput(float4(combinedLighting, alpha), fogFactor, PIXELFOGTYPE, TONEMAP_SCALE_LINEAR, bWriteDepthToAlpha, projPos.z);
 #endif
 }
