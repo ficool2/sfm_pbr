@@ -164,6 +164,8 @@ BEGIN_VS_SHADER(PBR, "PBR shader")
         INIT_FLOAT_PARM( ROUGHNESSFACTOR, 1.0f );
         INIT_FLOAT_PARM( AOFACTOR, 1.0f );
         INIT_FLOAT_PARM( SSAOFACTOR, 1.0f );
+        INIT_FLOAT_PARM( EMISSIVEFACTOR, 1.0f );
+        INIT_FLOAT_PARM( SPECULARFACTOR, 1.0f );
     };
 
     // Define shader fallback
