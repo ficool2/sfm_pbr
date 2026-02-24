@@ -25,7 +25,7 @@ float3 fresnelSchlickRoughness(float3 F0, float cosTheta, float roughness)
 // Uses Disney's reparametrization of alpha = roughness^2
 float ndfGGX(float cosLh, float roughness)
 {
-    float alpha   = roughness * roughness;
+    float alpha = roughness * roughness;
     float alphaSq = alpha * alpha;
 
     float denom = (cosLh * cosLh) * (alphaSq - 1.0) + 1.0;
@@ -97,8 +97,8 @@ float GetAttenForLight(float4 lightAtten, int lightNum)
 float3 calculateLight(float3 lightIn, float3 lightIntensity, float3 lightOut, float3 normal, float3 fresnelReflectance, float roughness, float metalness, float lightDirectionAngle, float3 albedo, in sampler lightWarpSampler)
 {
     // Lh
-    float3 HalfAngle = normalize(lightIn + lightOut); 
-	float NDotL = dot(normal, lightIn);
+    float3 HalfAngle = normalize(lightIn + lightOut);
+    float NDotL = dot(normal, lightIn);
     float cosLightIn = max(0.0, NDotL);
     float cosHalfAngle = max(0.0, dot(normal, HalfAngle));
 
@@ -133,15 +133,15 @@ float3 calculateLight(float3 lightIn, float3 lightIntensity, float3 lightOut, fl
 #endif
 
 #if LIGHTWARPTEXTURE
-	// Lightwarp. Diffuse term computed as half lambertian (looks better)
+    // Lightwarp. Diffuse term computed as half lambertian (looks better)
     float fHalfLambert = saturate(NDotL * 0.5 + 0.5);
-	// VLG only squared the intensity, but that's too dim for us
+    // VLG only squared the intensity, but that's too dim for us
     float3 warp = tex1D(lightWarpSampler, fHalfLambert).rgb * 3.0;
-	
+
     result = (diffuseBRDF * warp + specularBRDF) * lightIntensity;
 #endif
 
-	return result;
+    return result;
 }
 
 // Get diffuse ambient light
@@ -152,8 +152,8 @@ float3 ambientLookupLightmap(float3 normal, float3 EnvAmbientCube[6], float3 tex
     float2 bumpCoord3;
 
     ComputeBumpedLightmapCoordinates(
-            lightmapTexCoord1And2, lightmapTexCoord3.xy,
-            bumpCoord1, bumpCoord2, bumpCoord3);
+        lightmapTexCoord1And2, lightmapTexCoord3.xy,
+        bumpCoord1, bumpCoord2, bumpCoord3);
 
     float3 lightmapColor1 = LightMapSample(LightmapSampler, bumpCoord1);
     float3 lightmapColor2 = LightMapSample(LightmapSampler, bumpCoord2);
@@ -165,9 +165,9 @@ float3 ambientLookupLightmap(float3 normal, float3 EnvAmbientCube[6], float3 tex
     dp.z = saturate(dot(textureNormal, bumpBasis[2]));
     dp *= dp;
 
-    float3 diffuseLighting =    dp.x * lightmapColor1 +
-                                dp.y * lightmapColor2 +
-                                dp.z * lightmapColor3;
+    float3 diffuseLighting = dp.x * lightmapColor1 +
+        dp.y * lightmapColor2 +
+        dp.z * lightmapColor3;
 
     float sum = dot(dp, float3(1, 1, 1));
     diffuseLighting *= g_DiffuseModulation.xyz / sum;
@@ -186,7 +186,7 @@ float3 ambientLookup(float3 normal, float3 EnvAmbientCube[6], float3 textureNorm
 // Create an ambient cube from the envmap
 void setupEnvMapAmbientCube(out float3 EnvAmbientCube[6], sampler EnvmapSampler)
 {
-    float4 directionPosX = { 1, 0, 0, 12 }; float4 directionNegX = {-1, 0, 0, 12 };
+    float4 directionPosX = { 1, 0, 0, 12 }; float4 directionNegX = { -1, 0, 0, 12 };
     float4 directionPosY = { 0, 1, 0, 12 }; float4 directionNegY = { 0,-1, 0, 12 };
     float4 directionPosZ = { 0, 0, 1, 12 }; float4 directionNegZ = { 0, 0,-1, 12 };
     EnvAmbientCube[0] = ENV_MAP_SCALE * texCUBElod(EnvmapSampler, directionPosX).rgb;
@@ -200,21 +200,21 @@ void setupEnvMapAmbientCube(out float3 EnvAmbientCube[6], sampler EnvmapSampler)
 #if PARALLAXOCCLUSION
 float2 parallaxCorrect(float2 texCoord, float3 viewRelativeDir, float3 worldSpaceWorldToEye, float3 worldSpaceNormal, sampler depthMap, float parallaxDepth, float parallaxCenter)
 {
-    float fLength = length( viewRelativeDir );
-    float fParallaxLength = sqrt( fLength * fLength - viewRelativeDir.z * viewRelativeDir.z ) / viewRelativeDir.z; 
-    float2 vParallaxDirection = normalize(  viewRelativeDir.xy );
+    float fLength = length(viewRelativeDir);
+    float fParallaxLength = sqrt(fLength * fLength - viewRelativeDir.z * viewRelativeDir.z) / viewRelativeDir.z;
+    float2 vParallaxDirection = normalize(viewRelativeDir.xy);
     float2 vParallaxOffsetTS = vParallaxDirection * fParallaxLength;
     float fViewDotHorizonFactor = min(saturate(dot(normalize(worldSpaceNormal), normalize(worldSpaceWorldToEye))), 0.5) * 2;
     vParallaxOffsetTS *= saturate(parallaxDepth * fViewDotHorizonFactor);
 
-     // Compute all the derivatives:
-    float2 dx = ddx( texCoord );
-    float2 dy = ddy( texCoord );
+    // Compute all the derivatives:
+    float2 dx = ddx(texCoord);
+    float2 dy = ddy(texCoord);
 
     int nNumSteps = 20;
 
     float fCurrHeight = 0.0;
-    float fStepSize   = 1.0 / (float) nNumSteps;
+    float fStepSize = 1.0 / (float)nNumSteps;
     float fPrevHeight = 1.0;
     float fNextHeight = 0.0;
 
@@ -223,27 +223,27 @@ float2 parallaxCorrect(float2 texCoord, float3 viewRelativeDir, float3 worldSpac
 
     float2 vTexOffsetPerStep = fStepSize * vParallaxOffsetTS;
     float2 vTexCurrentOffset = texCoord;
-    float  fCurrentBound     = 1.0;
-    float  fParallaxAmount   = 0.0;
+    float  fCurrentBound = 1.0;
+    float  fParallaxAmount = 0.0;
 
     float2 pt1 = 0;
     float2 pt2 = 0;
 
     float2 texOffset2 = 0;
 
-    while ( nStepIndex < nNumSteps ) 
+    while (nStepIndex < nNumSteps)
     {
         vTexCurrentOffset -= vTexOffsetPerStep;
 
         // Sample height map which in this case is stored in the alpha channel of the normal map:
-        fCurrHeight = parallaxCenter + tex2Dgrad( depthMap, vTexCurrentOffset, dx, dy ).a;
+        fCurrHeight = parallaxCenter + tex2Dgrad(depthMap, vTexCurrentOffset, dx, dy).a;
 
         fCurrentBound -= fStepSize;
 
-        if ( fCurrHeight > fCurrentBound ) 
-        {     
-            pt1 = float2( fCurrentBound, fCurrHeight );
-            pt2 = float2( fCurrentBound + fStepSize, fPrevHeight );
+        if (fCurrHeight > fCurrentBound)
+        {
+            pt1 = float2(fCurrentBound, fCurrHeight);
+            pt2 = float2(fCurrentBound + fStepSize, fPrevHeight);
 
             texOffset2 = vTexCurrentOffset - vTexOffsetPerStep;
 
@@ -258,7 +258,7 @@ float2 parallaxCorrect(float2 texCoord, float3 viewRelativeDir, float3 worldSpac
 
     float fDelta2 = pt2.x - pt2.y;
     float fDelta1 = pt1.x - pt1.y;
-    fParallaxAmount = (pt1.x * fDelta2 - pt2.x * fDelta1 ) / ( fDelta2 - fDelta1 );
+    fParallaxAmount = (pt1.x * fDelta2 - pt2.x * fDelta1) / (fDelta2 - fDelta1);
     float2 vParallaxOffset = vParallaxOffsetTS * (1 - fParallaxAmount);
     // The computed texture offset for the displaced point on the pseudo-extruded surface:
     float2 texSample = texCoord - vParallaxOffset;
@@ -268,9 +268,45 @@ float2 parallaxCorrect(float2 texCoord, float3 viewRelativeDir, float3 worldSpac
 
 float3 worldToRelative(float3 worldVector, float3 surfTangent, float3 surfBasis, float3 surfNormal)
 {
-   return float3(
-       dot(worldVector, surfTangent),
-       dot(worldVector, surfBasis),
-       dot(worldVector, surfNormal)
-   );
+    return float3(
+        dot(worldVector, surfTangent),
+        dot(worldVector, surfBasis),
+        dot(worldVector, surfNormal)
+    );
+}
+
+// Improved Subsurface Scattering - Matches real ear translucency
+// Based on Jimenez et al. screen-space subsurface scattering
+float3 ComputeSubsurfaceScattering(float3 N, float3 L, float3 V, float thickness, float3 sssColor, float intensity, float powerScale)
+{
+    // N = surface normal (normalized)
+    // L = light direction (normalized)
+    // V = view direction (normalized)
+
+    // The key: SSS is strongest where light comes from behind (backlit)
+    // and thickness is low (thin areas like ear edges)
+    float backlit = max(0.0, -dot(N, L));
+
+    // Raised to power for smooth, natural falloff
+    backlit = pow(backlit, 0.3);
+
+    // Thickness is inverted: LOW thickness = MORE light transmission
+    // thickness map: white = thick (skin), black = thin (translucent areas)
+    float transmittance = pow(1.0 - thickness, powerScale);
+
+    // Combine: backlit areas + thin areas = strong SSS
+    float sssStrength = backlit * transmittance;
+
+    // Add some ambient SSS even without direct backlit (for fill light)
+    float ambientSSS = transmittance * 0.3;
+    sssStrength = max(sssStrength, ambientSSS);
+
+    // Apply color and intensity
+    float3 sssResult = sssColor * sssStrength * intensity;
+
+    // Slightly boost based on how much geometry is facing viewer
+    float facingFactor = saturate(dot(V, N));
+    sssResult *= (0.7 + 0.3 * facingFactor);
+
+    return sssResult;
 }
