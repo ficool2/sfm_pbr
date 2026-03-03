@@ -135,8 +135,7 @@ float3 calculateLight(float3 lightIn, float3 lightIntensity, float3 lightOut, fl
 #if LIGHTWARPTEXTURE
 	// Lightwarp. Diffuse term computed as half lambertian (looks better)
     float fHalfLambert = saturate(NDotL * 0.5 + 0.5);
-	// VLG only squared the intensity, but that's too dim for us
-    float3 warp = tex1D(lightWarpSampler, fHalfLambert).rgb * 3.0;
+    float3 warp = tex1D(lightWarpSampler, fHalfLambert).rgb;
 	
     result = (diffuseBRDF * warp + specularBRDF) * lightIntensity;
 #endif
