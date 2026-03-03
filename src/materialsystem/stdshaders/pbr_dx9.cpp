@@ -726,7 +726,7 @@ BEGIN_VS_SHADER(PBR, "PBR shader")
 
             float vSSSColor[4] = { 0, 0, 0, 0 };
             if ( info.sssColor != -1 )
-                params[info.baseColor]->GetVecValue( vSSSColor, 3 );
+                params[info.sssColor]->GetVecValue( vSSSColor, 3 );
             pShaderAPI->SetPixelShaderConstant( PSREG_PBR_SSS_COLOR, vSSSColor, 1 );
 
             // Need this for sampling SSAO
