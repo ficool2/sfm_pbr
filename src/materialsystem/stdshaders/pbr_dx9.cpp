@@ -556,7 +556,7 @@ BEGIN_VS_SHADER(PBR, "PBR shader")
                 pShaderAPI->BindStandardTexture(SAMPLER_SPECULAR, TEXTURE_BLACK);
             }
 
-            if (bLightwarpTexture)
+            if (bThicknessTexture)
             {
                 BindTexture(SAMPLER_THICKNESS, info.thicknessTexture, 0);
             }
